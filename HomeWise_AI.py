@@ -633,23 +633,7 @@ with tab2:
                     st.markdown(f"""<div class="feature-card"><h4>⚡ Difficulty</h4><span class="task-badge">{data.get('difficulty','N/A')}</span></div>""", unsafe_allow_html=True)
                 with col_b:
                     st.markdown(f"""<div class="feature-card"><h4>🚨 Urgency</h4><span style="background:{urgency_color};color:white;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;">{data.get('urgency','Low')}</span></div>""", unsafe_allow_html=True)
-                with col_c:
-                    savings = data['pro_cost']['min'] - data['diy_cost']['max']
-                    st.markdown(f"""<div class="feature-card"><h4>💵 DIY Savings</h4><span class="task-badge done">Save ~${max(0,savings):,}</span></div>""", unsafe_allow_html=True)
-
-                # Materials & Tools
-                col_m, col_t = st.columns(2)
-                with col_m:
-                    mats = "\n".join([f"• {m}" for m in data.get("materials", [])])
-                    st.markdown(f"""<div class="feature-card"><h4>🔩 Materials Needed</h4><div style="font-size:0.9rem; line-height:1.8;">{mats}</div></div>""", unsafe_allow_html=True)
-                with col_t:
-                    tools = "\n".join([f"• {t}" for t in data.get("tools", [])])
-                    st.markdown(f"""<div class="feature-card"><h4>🛠️ Tools Required</h4><div style="font-size:0.9rem; line-height:1.8;">{tools}</div></div>""", unsafe_allow_html=True)
-
-                # Tip
-                if data.get("tips"):
-                    st.markdown(f"""<div class="tip-box"><div class="tip-title">💡 Money-Saving Tip</div>{data['tips']}</div>""", unsafe_allow_html=True)
-
+        
                 # Add to calendar
                 if st.button("📅 Add to Maintenance Calendar"):
                     st.session_state.tasks.append({
