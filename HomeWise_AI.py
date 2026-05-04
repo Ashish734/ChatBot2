@@ -397,17 +397,54 @@ ONLY JSON, no other text."""
     return json.loads(raw.strip())
 
 def export_pdf(chat_history, tasks, cost_data=None):
+    # Create PDF with Unicode support
     pdf = FPDF()
     pdf.add_page()
     pdf.set_margins(20, 20, 20)
+    
+    # Helper function to clean text of problematic characters
+    def clean_text(text):
+        """Replace problematic characters with safe alternatives"""
+        if not isinstance(text, str):
+            text = str(text)
+        
+        replacements = {
+            "—": "-",      # em dash to regular dash
+            "–": "-",      # en dash to regular dash  
+            "’": "'",      # curly apostrophe to straight
+            "‘": "'",      # curly apostrophe to straight
+            "“": '"',      # curly quote to straight
+            "”": '"',      # curly quote to straight
+            "…": "...",    # ellipsis to three dots
+            "•": "-",      # bullet to dash
+            "®": "(R)",    # registered symbol
+            "™": "(TM)",   # trademark symbol
+            "°": "deg",    # degree symbol
+            "¢": "cent",   # cent symbol
+            "£": "GBP",    # pound symbol
+            "€": "EUR",    # euro symbol
+            "¥": "JPY",    # yen symbol
+            "©": "(c)",    # copyright symbol
+            "✓": "[OK]",   # checkmark
+            "✅": "[DONE]", # checkmark emoji
+            "❌": "[X]",    # x mark
+            "⭐": "*",      # star
+            "•": "-",      # bullet point
+        }
+        for char, replacement in replacements.items():
+            text = text.replace(char, replacement)
+        
+        # Remove any other non-ASCII characters (keep only ASCII)
+        text = ''.join(char for char in text if ord(char) < 128 or char in ' \n\t.,!?;:()[]{}"\'-')
+        return text
 
-    # Header
+    # Header with background
     pdf.set_fill_color(26, 60, 52)
     pdf.rect(0, 0, 210, 40, 'F')
+    pdf.set_y(15)
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_text_color(232, 168, 56)
-    pdf.cell(0, 20, "", ln=True)
-    pdf.cell(0, 15, "HomeWise AI - Maintenance Report", ln=True, align="C")
+    pdf.cell(0, 10, "HomeWise AI - Maintenance Report", ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(200, 200, 180)
     pdf.cell(0, 8, f"Generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", ln=True, align="C")
@@ -432,10 +469,16 @@ def export_pdf(chat_history, tasks, cost_data=None):
             pdf.set_font("Helvetica", "", 10)
             pdf.set_text_color(30, 30, 30)
             content = msg["content"]
+            
+            # Clean the content of problematic characters
+            content = clean_text(content)
+            
             # Remove markdown symbols for cleaner PDF
-            for sym in ["**", "*", "##", "#", "```"]:
+            for sym in ["**", "*", "##", "#", "```", "__"]:
                 content = content.replace(sym, "")
-            pdf.multi_cell(0, 6, content[:800])
+            
+            # Split long content into chunks if needed
+            pdf.multi_cell(0, 6, content[:2000])  # Limit length
             pdf.ln(3)
 
     # Tasks
@@ -452,13 +495,21 @@ def export_pdf(chat_history, tasks, cost_data=None):
             status_icon = "[DONE]" if task.get("done") else "[PENDING]"
             pdf.set_font("Helvetica", "B", 10)
             pdf.set_text_color(26, 60, 52)
-            pdf.cell(0, 7, f"{status_icon} {task['title']}", ln=True)
+            
+            title = clean_text(task.get('title', 'Untitled'))
+            pdf.cell(0, 7, f"{status_icon} {title}", ln=True)
+            
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(80, 80, 70)
-            pdf.cell(0, 6, f"Due: {task.get('due', 'TBD')}  |  Priority: {task.get('priority', 'Medium')}  |  Est. Cost: ${task.get('cost', 0)}", ln=True)
+            due_date = clean_text(task.get('due', 'TBD'))
+            priority = clean_text(task.get('priority', 'Medium'))
+            cost = task.get('cost', 0)
+            pdf.cell(0, 6, f"Due: {due_date}  |  Priority: {priority}  |  Est. Cost: ${cost:,}", ln=True)
+            
             if task.get("notes"):
                 pdf.set_text_color(100, 100, 90)
-                pdf.multi_cell(0, 5, task["notes"])
+                notes = clean_text(task["notes"])
+                pdf.multi_cell(0, 5, notes)
             pdf.ln(2)
 
     # Cost summary
@@ -470,32 +521,59 @@ def export_pdf(chat_history, tasks, cost_data=None):
         pdf.set_draw_color(232, 168, 56)
         pdf.line(20, pdf.get_y(), 190, pdf.get_y())
         pdf.ln(4)
+        
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(30, 30, 30)
-        pdf.multi_cell(0, 6, f"Task: {cost_data.get('task', '')}")
-        pdf.cell(0, 6, f"DIY Cost: ${cost_data['diy_cost']['min']} - ${cost_data['diy_cost']['max']}", ln=True)
-        pdf.cell(0, 6, f"Pro Cost: ${cost_data['pro_cost']['min']} - ${cost_data['pro_cost']['max']}", ln=True)
-        pdf.cell(0, 6, f"Difficulty: {cost_data.get('difficulty', '')}", ln=True)
-        pdf.cell(0, 6, f"Urgency: {cost_data.get('urgency', '')}", ln=True)
+        
+        task_name = clean_text(cost_data.get('task', ''))
+        pdf.multi_cell(0, 6, f"Task: {task_name}")
+        
+        # Safely get nested values
+        diy_min = cost_data.get('diy_cost', {}).get('min', 0)
+        diy_max = cost_data.get('diy_cost', {}).get('max', 0)
+        pdf.cell(0, 6, f"DIY Cost: ${diy_min:,} - ${diy_max:,}", ln=True)
+        
+        pro_min = cost_data.get('pro_cost', {}).get('min', 0)
+        pro_max = cost_data.get('pro_cost', {}).get('max', 0)
+        pdf.cell(0, 6, f"Pro Cost: ${pro_min:,} - ${pro_max:,}", ln=True)
+        
+        difficulty = clean_text(cost_data.get('difficulty', ''))
+        pdf.cell(0, 6, f"Difficulty: {difficulty}", ln=True)
+        
+        urgency = clean_text(cost_data.get('urgency', ''))
+        pdf.cell(0, 6, f"Urgency: {urgency}", ln=True)
+        
         if cost_data.get("materials"):
             pdf.ln(2)
             pdf.set_font("Helvetica", "B", 10)
             pdf.cell(0, 7, "Materials Needed:", ln=True)
             pdf.set_font("Helvetica", "", 10)
             for m in cost_data["materials"]:
-                pdf.cell(0, 6, f"  - {m}", ln=True)
+                material = clean_text(m)
+                pdf.cell(0, 6, f"  - {material}", ln=True)
+        
+        if cost_data.get("tools"):
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 7, "Tools Required:", ln=True)
+            pdf.set_font("Helvetica", "", 10)
+            for t in cost_data["tools"]:
+                tool = clean_text(t)
+                pdf.cell(0, 6, f"  - {tool}", ln=True)
+        
         if cost_data.get("tips"):
             pdf.ln(2)
             pdf.set_font("Helvetica", "B", 10)
             pdf.cell(0, 7, "Money-Saving Tip:", ln=True)
             pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 6, cost_data["tips"])
+            tip = clean_text(cost_data["tips"])
+            pdf.multi_cell(0, 6, tip)
 
     # Footer on last page
     pdf.set_y(-20)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(150, 150, 130)
-    pdf.cell(0, 8, "HomeWise AI — Your Intelligent Home Maintenance Companion", align="C")
+    pdf.cell(0, 8, "HomeWise AI - Your Intelligent Home Maintenance Companion", ln=True, align="C")
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf.output(tmp.name)
@@ -870,44 +948,9 @@ with tab5:
         task_count = len(st.session_state.tasks)
         has_cost = "last_cost_data" in st.session_state
 
-        st.markdown(f"""
-        <div class="feature-card">
-            <div style="font-size:0.85rem;line-height:2;">
-                {'✅' if inc_chat and chat_count else '⬜'} Chat messages: <strong>{chat_count // 2} exchanges</strong><br>
-                {'✅' if inc_tasks and task_count else '⬜'} Tasks: <strong>{task_count} items</strong><br>
-                {'✅' if inc_cost and has_cost else '⬜'} Cost estimate: <strong>{'Available' if has_cost else 'None yet'}</strong><br>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
         export_btn = st.button("📥 Generate PDF Report", key="export_btn")
 
-    with col2:
-        st.markdown("#### 📊 Home Summary")
-        hp = st.session_state.home_profile
-        age = datetime.now().year - hp["year_built"]
-        done_t = sum(1 for t in st.session_state.tasks if t.get("done"))
-        pending_t = len(st.session_state.tasks) - done_t
-        total_est = sum(t.get("cost", 0) for t in st.session_state.tasks)
-
-        st.markdown(f"""
-        <div class="cost-card">
-            <div style="font-size:0.85rem; opacity:0.7; margin-bottom:1rem;">YOUR HOME PROFILE</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;text-align:left;">
-                <div><div style="font-size:0.7rem;opacity:0.6;">TYPE</div><div style="font-weight:700;">{hp['type']}</div></div>
-                <div><div style="font-size:0.7rem;opacity:0.6;">AGE</div><div style="font-weight:700;">{age} years</div></div>
-                <div><div style="font-size:0.7rem;opacity:0.6;">SIZE</div><div style="font-weight:700;">{hp['size_sqft']:,} sq ft</div></div>
-                <div><div style="font-size:0.7rem;opacity:0.6;">LOCATION</div><div style="font-weight:700;">{hp['location']}</div></div>
-                <div><div style="font-size:0.7rem;opacity:0.6;">TASKS DONE</div><div style="font-weight:700;color:#a8e6cf;">{done_t}</div></div>
-                <div><div style="font-size:0.7rem;opacity:0.6;">PENDING</div><div style="font-weight:700;color:var(--accent);">{pending_t}</div></div>
-            </div>
-            <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,0.2);">
-                <div style="font-size:0.7rem;opacity:0.6;">TOTAL ESTIMATED MAINTENANCE COST</div>
-                <div class="cost-value">${total_est:,}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+    
     if export_btn:
         chat_to_export = st.session_state.messages if inc_chat else []
         tasks_to_export = st.session_state.tasks if inc_tasks else []
