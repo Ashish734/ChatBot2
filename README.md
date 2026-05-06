@@ -1,7 +1,7 @@
 # HomeWise AI
 AI-powered home repair assistant using Groq's Llama 3 API.
 
-Setup
+#Setup
 1.Clone this repository
 2.Install dependencies: pip install -r requirements.txt
 3.Get your Groq API key from https://console.groq.com
