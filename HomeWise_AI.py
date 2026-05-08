@@ -712,17 +712,6 @@ with tab2:
                 with col_b:
                     st.markdown(f"""<div class="feature-card"><h4>🚨 Urgency</h4><span style="background:{urgency_color};color:white;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;">{data.get('urgency','Low')}</span></div>""", unsafe_allow_html=True)
         
-                # Add to calendar
-                if st.button("📅 Add to Maintenance Calendar"):
-                    st.session_state.tasks.append({
-                        "title": cost_task,
-                        "due": str(date.today()),
-                        "priority": data.get("urgency", "Medium"),
-                        "cost": data['pro_cost']['min'],
-                        "notes": f"DIY: ${data['diy_cost']['min']}-${data['diy_cost']['max']} | Pro: ${data['pro_cost']['min']}-${data['pro_cost']['max']}",
-                        "done": False
-                    })
-                    st.success("✅ Added to your maintenance calendar!")
 
             except json.JSONDecodeError:
                 st.error("Could not parse cost estimate. Try rephrasing your task.")
